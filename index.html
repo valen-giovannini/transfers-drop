@@ -358,11 +358,13 @@
     document.getElementById('role-screen').style.display = 'none';
     document.getElementById('receiver-screen').style.display = 'flex';
 
-    // Listen for transfer
+    const joinedAt = Date.now();
+
+    // Listen for transfer — only react to transfers after joining
     onValue(ref(db, 'transfer'), (snapshot) => {
       const data = snapshot.val();
       if (!data) return;
-      if (data.sent && data.amount > 0) {
+      if (data.sent && data.amount > 0 && data.timestamp > joinedAt) {
         receiveAmount(data.amount);
       }
     });
