@@ -1,0 +1,468 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
+  <title>Cash Drop</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      background: #000;
+      color: #fff;
+      font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+      height: 100vh;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      user-select: none;
+    }
+
+    #role-screen {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 24px;
+      padding: 32px;
+      text-align: center;
+    }
+
+    #role-screen h1 {
+      font-size: 28px;
+      font-weight: 700;
+    }
+
+    #role-screen p {
+      font-size: 16px;
+      color: #888;
+      line-height: 1.5;
+    }
+
+    .role-btn {
+      width: 100%;
+      padding: 18px;
+      border-radius: 16px;
+      border: none;
+      font-size: 18px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: transform 0.1s, opacity 0.1s;
+    }
+
+    .role-btn:active { transform: scale(0.97); opacity: 0.8; }
+
+    .btn-sender { background: #fff; color: #000; }
+    .btn-receiver { background: #1a1a1a; color: #fff; border: 1px solid #333; }
+
+    /* SENDER */
+    #sender-screen {
+      display: none;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 100vh;
+      width: 100%;
+      padding: 32px;
+      text-align: center;
+      position: relative;
+    }
+
+    #amount-display {
+      font-size: 80px;
+      font-weight: 800;
+      letter-spacing: -2px;
+      transition: transform 0.1s ease;
+      font-variant-numeric: tabular-nums;
+    }
+
+    #amount-display.tilting {
+      color: #00e676;
+    }
+
+    #tilt-indicator {
+      margin-top: 24px;
+      font-size: 14px;
+      color: #555;
+      height: 20px;
+      transition: color 0.3s;
+    }
+
+    #tilt-indicator.active {
+      color: #00e676;
+    }
+
+    #send-status {
+      margin-top: 16px;
+      font-size: 13px;
+      color: #555;
+      height: 20px;
+    }
+
+    .amount-input-row {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 48px;
+    }
+
+    .amount-btn {
+      width: 48px;
+      height: 48px;
+      border-radius: 50%;
+      border: 1px solid #333;
+      background: #111;
+      color: #fff;
+      font-size: 24px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .amount-btn:active { opacity: 0.6; }
+
+    #permission-btn {
+      margin-top: 32px;
+      padding: 14px 28px;
+      background: #222;
+      border: 1px solid #444;
+      border-radius: 12px;
+      color: #fff;
+      font-size: 15px;
+      cursor: pointer;
+      display: none;
+    }
+
+    /* RECEIVER */
+    #receiver-screen {
+      display: none;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 100vh;
+      width: 100%;
+      text-align: center;
+      position: relative;
+      overflow: hidden;
+    }
+
+    #receiver-amount {
+      font-size: 80px;
+      font-weight: 800;
+      letter-spacing: -2px;
+      font-variant-numeric: tabular-nums;
+      opacity: 0;
+      transform: translateY(60px);
+      transition: opacity 0.6s ease, transform 0.6s ease;
+    }
+
+    #receiver-amount.visible {
+      opacity: 1;
+      transform: translateY(0);
+    }
+
+    #receiver-label {
+      font-size: 16px;
+      color: #555;
+      margin-bottom: 24px;
+    }
+
+    #receiver-status {
+      font-size: 14px;
+      color: #444;
+      margin-top: 24px;
+    }
+
+    /* Particles */
+    #canvas {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+      z-index: 10;
+    }
+
+    /* Tilt visual feedback */
+    #tilt-bar-container {
+      width: 200px;
+      height: 6px;
+      background: #222;
+      border-radius: 3px;
+      margin-top: 32px;
+      overflow: hidden;
+    }
+
+    #tilt-bar {
+      height: 100%;
+      width: 0%;
+      background: #00e676;
+      border-radius: 3px;
+      transition: width 0.15s ease, background 0.3s;
+    }
+
+    #tilt-bar.danger { background: #ff5252; }
+
+    .sent-flash {
+      position: fixed;
+      inset: 0;
+      background: #00e676;
+      opacity: 0;
+      pointer-events: none;
+      z-index: 20;
+      transition: opacity 0.1s;
+    }
+
+    .sent-flash.show { opacity: 0.15; }
+  </style>
+</head>
+<body>
+
+<canvas id="canvas"></canvas>
+<div class="sent-flash" id="flash"></div>
+
+<!-- ROLE SELECTION -->
+<div id="role-screen">
+  <h1>Cash Drop</h1>
+  <p>Seleccioná tu rol para este experimento</p>
+  <button class="role-btn btn-sender" onclick="initSender()">💸 Soy el que envía</button>
+  <button class="role-btn btn-receiver" onclick="initReceiver()">📲 Soy el que recibe</button>
+</div>
+
+<!-- SENDER -->
+<div id="sender-screen">
+  <div class="amount-input-row">
+    <button class="amount-btn" onclick="changeAmount(-100)">−</button>
+    <div id="amount-display">$500</div>
+    <button class="amount-btn" onclick="changeAmount(100)">+</button>
+  </div>
+  <div id="tilt-bar-container">
+    <div id="tilt-bar"></div>
+  </div>
+  <div id="tilt-indicator">Incliná el celular para enviar</div>
+  <div id="send-status"></div>
+  <button id="permission-btn" onclick="requestPermission()">Activar sensor de movimiento</button>
+</div>
+
+<!-- RECEIVER -->
+<div id="receiver-screen">
+  <div id="receiver-label">Esperando transferencia...</div>
+  <div id="receiver-amount">$0</div>
+  <div id="receiver-status">Mantené el celular plano</div>
+</div>
+
+<!-- Firebase -->
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+  import { getDatabase, ref, set, onValue } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
+
+  const firebaseConfig = {
+    apiKey: "AIzaSyCVb1r7_p4NFn0AS1xlqjSmLDpRrFlnbSw",
+    authDomain: "transfers-9ce8a.firebaseapp.com",
+    databaseURL: "https://transfers-9ce8a-default-rtdb.firebaseio.com",
+    projectId: "transfers-9ce8a",
+    storageBucket: "transfers-9ce8a.firebasestorage.app",
+    messagingSenderId: "78948978119",
+    appId: "1:78948978119:web:c10d19dd1f59bba87cdde2"
+  };
+
+  const app = initializeApp(firebaseConfig);
+  const db = getDatabase(app);
+
+  // ─── State ───────────────────────────────────────────
+  let amount = 500;
+  let role = null;
+  let tiltAngle = 0;
+  let hasSent = false;
+  let permissionGranted = false;
+
+  const TILT_THRESHOLD = 55; // degrees to trigger send
+
+  // ─── Canvas particles ─────────────────────────────────
+  const canvas = document.getElementById('canvas');
+  const ctx = canvas.getContext('2d');
+  canvas.width = window.innerWidth;
+  canvas.height = window.innerHeight;
+  let particles = [];
+
+  function spawnParticles(fromTop) {
+    for (let i = 0; i < 60; i++) {
+      particles.push({
+        x: Math.random() * canvas.width,
+        y: fromTop ? -20 : canvas.height + 20,
+        vx: (Math.random() - 0.5) * 4,
+        vy: fromTop ? Math.random() * 6 + 2 : -(Math.random() * 6 + 2),
+        size: Math.random() * 8 + 4,
+        alpha: 1,
+        char: ['$', amount.toString(), '💸', '•'][Math.floor(Math.random() * 4)]
+      });
+    }
+  }
+
+  function animateParticles() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    particles = particles.filter(p => p.alpha > 0.01);
+    particles.forEach(p => {
+      p.x += p.vx;
+      p.y += p.vy;
+      p.alpha -= 0.018;
+      ctx.globalAlpha = p.alpha;
+      ctx.font = `${p.size * 2}px -apple-system, sans-serif`;
+      ctx.fillStyle = '#00e676';
+      ctx.fillText(p.char, p.x, p.y);
+    });
+    ctx.globalAlpha = 1;
+    requestAnimationFrame(animateParticles);
+  }
+  animateParticles();
+
+  // ─── Expose globals ───────────────────────────────────
+  window.amount = amount;
+
+  window.changeAmount = function(delta) {
+    amount = Math.max(100, amount + delta);
+    document.getElementById('amount-display').textContent = '$' + amount;
+  };
+
+  window.initSender = function() {
+    role = 'sender';
+    document.getElementById('role-screen').style.display = 'none';
+    document.getElementById('sender-screen').style.display = 'flex';
+
+    // Reset Firebase state
+    set(ref(db, 'transfer'), { amount: 0, sent: false, timestamp: Date.now() });
+
+    // iOS needs explicit permission
+    if (typeof DeviceOrientationEvent !== 'undefined' &&
+        typeof DeviceOrientationEvent.requestPermission === 'function') {
+      document.getElementById('permission-btn').style.display = 'block';
+    } else {
+      startMotion();
+    }
+  };
+
+  window.requestPermission = function() {
+    DeviceOrientationEvent.requestPermission().then(state => {
+      if (state === 'granted') {
+        document.getElementById('permission-btn').style.display = 'none';
+        startMotion();
+      }
+    }).catch(console.error);
+  };
+
+  window.initReceiver = function() {
+    role = 'receiver';
+    document.getElementById('role-screen').style.display = 'none';
+    document.getElementById('receiver-screen').style.display = 'flex';
+
+    // Listen for transfer
+    onValue(ref(db, 'transfer'), (snapshot) => {
+      const data = snapshot.val();
+      if (!data) return;
+      if (data.sent && data.amount > 0) {
+        receiveAmount(data.amount);
+      }
+    });
+  };
+
+  function startMotion() {
+    window.addEventListener('deviceorientation', handleOrientation);
+  }
+
+  function handleOrientation(event) {
+    // beta = front-to-back tilt (-180 to 180)
+    const beta = event.beta || 0;
+    tiltAngle = Math.abs(beta);
+
+    const el = document.getElementById('amount-display');
+    const bar = document.getElementById('tilt-bar');
+    const indicator = document.getElementById('tilt-indicator');
+    const progress = Math.min(tiltAngle / TILT_THRESHOLD, 1);
+
+    bar.style.width = (progress * 100) + '%';
+
+    if (tiltAngle > TILT_THRESHOLD * 0.5) {
+      bar.classList.add('danger');
+      el.classList.add('tilting');
+      indicator.classList.add('active');
+      indicator.textContent = tiltAngle > TILT_THRESHOLD * 0.8
+        ? '¡Soltá! Ya casi...'
+        : 'Seguí inclinando...';
+    } else {
+      bar.classList.remove('danger');
+      el.classList.remove('tilting');
+      indicator.classList.remove('active');
+      indicator.textContent = 'Incliná el celular para enviar';
+    }
+
+    // Trigger send
+    if (tiltAngle >= TILT_THRESHOLD && !hasSent) {
+      hasSent = true;
+      triggerSend();
+    }
+
+    // Reset if back to flat
+    if (tiltAngle < 15) {
+      hasSent = false;
+    }
+  }
+
+  function triggerSend() {
+    const sendAmt = amount;
+
+    // Flash
+    const flash = document.getElementById('flash');
+    flash.classList.add('show');
+    setTimeout(() => flash.classList.remove('show'), 300);
+
+    // Particles from top
+    spawnParticles(true);
+
+    // Update display
+    document.getElementById('send-status').textContent = '✓ Enviado $' + sendAmt;
+    document.getElementById('amount-display').textContent = '$0';
+
+    // Send to Firebase
+    set(ref(db, 'transfer'), {
+      amount: sendAmt,
+      sent: true,
+      timestamp: Date.now()
+    });
+
+    setTimeout(() => {
+      document.getElementById('send-status').textContent = '';
+      document.getElementById('amount-display').textContent = '$' + amount;
+    }, 3000);
+  }
+
+  function receiveAmount(val) {
+    const el = document.getElementById('receiver-amount');
+    const label = document.getElementById('receiver-label');
+    const status = document.getElementById('receiver-status');
+
+    // Particles from bottom
+    spawnParticles(false);
+
+    el.textContent = '$' + val;
+    el.classList.add('visible');
+    label.textContent = 'Recibiste';
+    status.textContent = '💚';
+
+    // Flash green
+    const flash = document.getElementById('flash');
+    flash.classList.add('show');
+    setTimeout(() => flash.classList.remove('show'), 400);
+
+    setTimeout(() => {
+      label.textContent = 'Esperando transferencia...';
+      el.classList.remove('visible');
+      status.textContent = 'Mantené el celular plano';
+    }, 5000);
+  }
+</script>
+
+</body>
+</html>
